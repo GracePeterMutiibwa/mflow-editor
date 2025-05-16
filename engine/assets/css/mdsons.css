@@ -1,0 +1,88 @@
+.input-group-text,
+textarea,
+input[type="text"],
+input[type="email"],
+input[type="number"] {
+  border-radius: 2px !important;
+}
+
+.bg-valid {
+  background-color: #d1e7dd !important;
+}
+
+.bg-invalid {
+  background-color: #f8d7da !important;
+}
+
+.bg-black {
+  background-color: black !important;
+}
+
+.offcanvas-header {
+  display: flex;
+  justify-content: space-between;
+}
+
+.bt-close {
+  width: 40px;
+
+  height: 40px;
+
+  border-radius: 50%;
+
+  background-color: #007bff;
+
+  color: white;
+
+  border: none;
+
+  font-size: 18px;
+
+  display: flex;
+
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.bt-close:hover {
+  background-color: #0056b3;
+}
+
+.bt-close:focus {
+  outline: none;
+
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.5);
+}
+
+.text-success {
+  color: #098842 !important;
+}
+
+.bg-success,
+.alert-success {
+  background-color: #098842 !important;
+}
+
+.text-warning {
+  color: #ff7400 !important;
+}
+
+.alert-warning,
+.bg-warning {
+  background-color: #ff7400 !important;
+}
+
+.text-danger {
+  color: #ff0000 !important;
+}
+
+.alert-danger,
+.bg-danger {
+  background-color: #830a3e !important;
+}
+
+.border-none {
+  border: none !important;
+}

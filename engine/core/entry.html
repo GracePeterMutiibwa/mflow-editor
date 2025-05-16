@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Moldo Visual Editor</title>
+    <link rel="icon" href="../assets/icons/moldo.png" type="image/png" />
+    <link
+      rel="stylesheet"
+      href="../assets/bootstrapicons/bootstrap-icons.css"
+    />
+
+    <link rel="stylesheet" href="../assets/boxicons/css/boxicons.min.css" />
+    <link rel="stylesheet" href="../assets/css/mds.css" />
+    <link rel="stylesheet" href="../assets/css/mdsven.css" />
+    <link rel="stylesheet" href="../assets/css/mdsex.css" />
+    <link rel="stylesheet" href="../assets/css/mdsons.css" />
+
+    <link rel="stylesheet" href="../ed/css/me.css" />
+    <script
+      src="https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js"
+      defer
+    ></script>
+  </head>
+  <body>
+    <div class="moed-container moed-visual-mode" id="moedEditor">
+      <header class="moed-header">
+        <button
+          class="moed-button moed-toggle-gui-button"
+          id="moedToggleGuiBtn"
+        >
+          <i class="bi bi-grid-3x3-gap"></i>
+        </button>
+        <div class="moed-logo">Moldo Flow Editor</div>
+        <div class="moed-button-bar">
+          <button class="moed-button moed-clear-button">
+            <i class="bi bi-trash"></i> Clear
+          </button>
+          <button class="moed-button moed-save-button">
+            <i class="bi bi-save"></i> Save
+          </button>
+          <button class="moed-button moed-run-button d-none">
+            <i class="bi bi-play-fill"></i> Run Flow
+          </button>
+        </div>
+        <button class="moed-button moed-settings-button">
+          <i class="bi bi-gear"></i>
+        </button>
+      </header>
+
+      <main class="moed-content">
+        <aside class="moed-sidebar">
+          <div
+            class="moed-component-list-container bg-soft-secondary border-bottom"
+          >
+            <h4 class="px-3 py-2 mb-0">Flow Components</h4>
+            <div class="moed-component-list">
+              <div
+                class="moed-draggable-component process-node"
+                draggable="true"
+                data-component-type="component1"
+              >
+                Process Block
+              </div>
+              <div
+                class="moed-draggable-component input-component"
+                draggable="true"
+                data-component-type="component10"
+              >
+                Input Block
+              </div>
+              <div
+                class="moed-draggable-component decision-node"
+                draggable="true"
+                data-component-type="component2"
+              >
+                Decision Block
+              </div>
+              <div
+                class="moed-draggable-component output-node"
+                draggable="true"
+                data-component-type="component3"
+              >
+                Output Block
+              </div>
+              <div
+                class="moed-draggable-component declaration-component"
+                draggable="true"
+                data-component-type="component5"
+              >
+                Declaration Block
+              </div>
+              <div
+                class="moed-draggable-component loop-component"
+                draggable="true"
+                data-component-type="component7"
+              >
+                Loop Block
+              </div>
+              <div
+                class="moed-draggable-component termination-component"
+                draggable="true"
+                data-component-type="component8"
+              >
+                Termination Block
+              </div>
+              <div
+                class="moed-draggable-component conditional-component"
+                draggable="true"
+                data-component-type="component4"
+              >
+                Conditional Block
+              </div>
+            </div>
+          </div>
+          <div class="moed-sidebar-bottom">
+            <div class="list-group rounded-0">
+              <a
+                class="list-group-item list-group-item-action"
+                href="#"
+                id="moedImportFlowButton"
+              >
+                <i class="bi-list-task list-group-icon"></i> Import Flow
+              </a>
+              <a
+                class="list-group-item list-group-item-action"
+                href="#"
+                id="moedNewFlowButton"
+              >
+                <i class="bi-layers list-group-icon"></i> New Flow
+              </a>
+            </div>
+
+            <div class="moed-speed-control-container px-3 pt-3 pb-2 border-top">
+              <label
+                for="executionSpeedSlider"
+                class="form-label mb-1 small"
+                id="executionSpeedLabel"
+                >Execution Speed: 5s</label
+              >
+              <input
+                type="range"
+                class="form-range"
+                min="0.5"
+                max="5"
+                step="0.1"
+                value="0.4"
+                id="executionSpeedSlider"
+                title="Adjust execution delay (seconds)"
+              />
+            </div>
+
+            <div class="moed-switch-container">
+              <button class="moed-switch-button" id="moedToggleMode">
+                Switch to Text Mode
+              </button>
+            </div>
+          </div>
+        </aside>
+
+        <div class="moed-text-keep">
+          <textarea
+            class="moed-text-area"
+            id="moedTextArea"
+            placeholder="Flow diagram content will appear here..."
+            readonly
+          ></textarea>
+        </div>
+
+        <div class="moed-editor-area" id="moedEditorArea">
+          <div class="moed-empty-state" id="moedEmptyState">
+            <i class="bi bi-diagram-3"></i>
+            Drag components here to build your flow
+          </div>
+        </div>
+
+        <div class="moed-output-pane bg-light">
+          <div class="moed-output-content-container p-2">
+            <div class="moed-output-title border-bottom pb-3">Flow Output</div>
+            <div class="moed-output-content p-0" id="moedOutputContent">
+              <div class="output-item">
+                <span class="output-title">Flow Editor</span>
+                <span
+                  >Build your flow by dragging components from the sidebar and
+                  then run it to see the execution here.</span
+                >
+              </div>
+            </div>
+          </div>
+          <div class="moed-server-status bg-white moed-disconnected">
+            <span class="moed-status-indicator"></span>
+            Flow engine connected
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <div
+      class="modal fade"
+      id="declarationSettingsModal"
+      tabindex="-1"
+      aria-labelledby="declarationSettingsModalLabel"
+    >
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="declarationSettingsModalLabel">
+              Declaration Block Settings
+            </h5>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+              aria-label="Close"
+            ></button>
+          </div>
+          <div class="modal-body">
+            <div id="declarationVariablesContainer">
+              <div class="no-variables-message">
+                No variables defined yet. Add a variable using the button below.
+              </div>
+            </div>
+            <div class="mb-3 mt-3">
+              <button type="button" class="btn btn-primary" id="addVariableBtn">
+                <i class="bi bi-plus-circle"></i> Add Variable
+              </button>
+            </div>
+            <template id="variableRowTemplate">
+              <div class="variable-row mb-3 row">
+                <div class="col-4">
+                  <input
+                    type="text"
+                    class="form-control variable-name"
+                    placeholder="Variable Name"
+                  />
+                </div>
+                <div class="col-3">
+                  <select class="form-select variable-type">
+                    <option value="text">Text</option>
+                    <option value="int">Integer</option>
+                    <option value="float">Float</option>
+                    <option value="boolean">Boolean</option>
+                  </select>
+                </div>
+                <div class="col-4">
+                  <input
+                    type="text"
+                    class="form-control variable-value"
+                    placeholder="Value"
+                  />
+                </div>
+                <div class="col-1">
+                  <button
+                    type="button"
+                    class="btn btn-danger delete-variable-btn"
+                  >
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+              </div>
+            </template>
+          </div>
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              data-bs-dismiss="modal"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="btn btn-primary"
+              id="saveDeclarationSettings"
+            >
+              Save Changes
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      class="modal fade"
+      id="outputSettingsModal"
+      tabindex="-1"
+      aria-labelledby="outputSettingsModalLabel"
+    >
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="outputSettingsModalLabel">
+              Output Block Settings
+            </h5>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+              aria-label="Close"
+            ></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-3">
+              <label for="outputMessageText" class="form-label"
+                >Output Message</label
+              >
+              <textarea
+                class="form-control"
+                id="outputMessageText"
+                rows="3"
+                placeholder="Enter the message to display in output"
+              ></textarea>
+              <div class="form-text">
+                Use {variableName} to include variable values in your message
+              </div>
+              <div id="outputMessageFeedback" class="invalid-feedback"></div>
+            </div>
+            <div class="mb-3">
+              <label for="availableVariables" class="form-label"
+                >Available Variables</label
+              >
+              <div
+                id="availableVariables"
+                class="small text-muted p-2 border rounded bg-light"
+              >
+                <div id="noAvailableVars" class="text-center py-1">
+                  No variables available
+                </div>
+                <div id="availableVarsList"></div>
+              </div>
+              <div class="form-text">
+                Click on a variable to insert it into your message using
+                {variableName} format
+              </div>
+            </div>
+            <div
+              class="alert alert-info"
+              id="noVariablesAlert"
+              style="display: none"
+            >
+              <i class="bi bi-info-circle"></i> No variables available. Add
+              variables in a Declaration block first.
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              data-bs-dismiss="modal"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="btn btn-primary"
+              id="saveOutputSettings"
+            >
+              Save Changes
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      class="modal fade"
+      id="conditionalSettingsModal"
+      tabindex="-1"
+      aria-labelledby="conditionalSettingsModalLabel"
+    >
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="conditionalSettingsModalLabel">
+              Conditional Block Settings
+            </h5>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+              aria-label="Close"
+            ></button>
+          </div>
+          <div class="modal-body">
+            <div class="card mb-3">
+              <div class="card-header bg-light">
+                <strong>Define Condition</strong>
+              </div>
+              <div class="card-body">
+                <div class="row g-3 align-items-center">
+                  <div class="col-12 col-md-4">
+                    <label for="conditionalLeftVar" class="form-label"
+                      >If variable</label
+                    >
+                    <select class="form-select" id="conditionalLeftVar">
+                      <option value="" selected disabled>
+                        Select variable...
+                      </option>
+                    </select>
+                  </div>
+                  <div class="col-12 col-md-4">
+                    <label for="conditionalOperator" class="form-label"
+                      >Operator</label
+                    >
+                    <select class="form-select" id="conditionalOperator">
+                      <option value="" selected disabled>
+                        Select operator...
+                      </option>
+                      <option value="==">=== (Equal to)</option>
+                      <option value="!=">!== (Not equal to)</option>
+                      <option value=">">> (Greater than)</option>
+                      <option value=">=">>= (Greater than or equal)</option>
+                      <option value="<">< (Less than)</option>
+                      <option value="<="><= (Less than or equal)</option>
+                      <option value="%">% (Modulus is)</option>
+                    </select>
+                  </div>
+                  <div class="col-12 col-md-4">
+                    <label for="conditionalRightValue" class="form-label"
+                      >Value</label
+                    >
+                    <div id="conditionalRightValueContainer">
+                      <input
+                        type="text"
+                        class="form-control"
+                        id="conditionalRightValue"
+                        placeholder="Enter value or select variable"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div class="mt-3">
+                  <div class="form-check form-switch">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      id="useVariableForRight"
+                    />
+                    <label class="form-check-label" for="useVariableForRight"
+                      >Compare with another variable</label
+                    >
+                  </div>
+                </div>
+                <div
+                  id="conditionalRightVarContainer"
+                  class="mt-3"
+                  style="display: none"
+                >
+                  <select class="form-select" id="conditionalRightVar">
+                    <option value="" selected disabled>
+                      Select variable...
+                    </option>
+                  </select>
+                </div>
+                <div class="alert alert-secondary mt-3" id="conditionPreview">
+                  <i class="bi bi-code-slash"></i>
+                  <span id="conditionPreviewText"
+                    >Define your condition above</span
+                  >
+                </div>
+              </div>
+            </div>
+            <div
+              class="alert alert-info"
+              id="noVariablesAlertConditional"
+              style="display: none"
+            >
+              <i class="bi bi-info-circle"></i> No variables available. Add
+              variables in a Declaration block first.
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              data-bs-dismiss="modal"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="btn btn-primary"
+              id="saveConditionalSettings"
+              disabled
+            >
+              Save Changes
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      class="modal fade"
+      id="processSettingsModal"
+      tabindex="-1"
+      aria-labelledby="processSettingsModalLabel"
+    >
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="processSettingsModalLabel">
+              Process Block Settings
+            </h5>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+              aria-label="Close"
+            ></button>
+          </div>
+          <div class="modal-body">
+            <div class="card mb-3">
+              <div class="card-header bg-light">
+                <strong>Variable Operation</strong>
+              </div>
+              <div class="card-body">
+                <div class="row g-3 mb-3">
+                  <div class="col-12 col-md-4">
+                    <label for="processTargetVar" class="form-label"
+                      >Target Variable</label
+                    >
+                    <select class="form-select" id="processTargetVar">
+                      <option value="" selected disabled>
+                        Select variable...
+                      </option>
+                    </select>
+                  </div>
+                  <div class="col-12 col-md-4">
+                    <label for="processOperation" class="form-label"
+                      >Operation</label
+                    >
+                    <select class="form-select" id="processOperation">
+                      <option value="" selected disabled>
+                        Select operation...
+                      </option>
+                      <option value="=">= (Assign)</option>
+                      <option value="+">+ (Add)</option>
+                      <option value="-">- (Subtract)</option>
+                      <option value="*">* (Multiply)</option>
+                      <option value="/">/ (Divide)</option>
+                      <option value="^2">^2 (Square)</option>
+                      <option value="sqrt">√ (Square Root)</option>
+                      <option value="%">% (Modulus)</option>
+                    </select>
+                  </div>
+                  <div class="col-12 col-md-4">
+                    <label for="processValueType" class="form-label">Use</label>
+                    <select class="form-select" id="processValueType">
+                      <option value="value" selected>Value</option>
+                      <option value="variable">Variable</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="row g-3">
+                  <div class="col-12" id="processValueContainer">
+                    <label for="processValue" class="form-label">Value</label>
+                    <input
+                      type="text"
+                      class="form-control"
+                      id="processValue"
+                      placeholder="Enter a value"
+                    />
+                  </div>
+                  <div
+                    class="col-12"
+                    id="processSecondVarContainer"
+                    style="display: none"
+                  >
+                    <label for="processSecondVar" class="form-label"
+                      >Variable</label
+                    >
+                    <select class="form-select" id="processSecondVar">
+                      <option value="" selected disabled>
+                        Select variable...
+                      </option>
+                    </select>
+                  </div>
+                </div>
+                <div
+                  class="alert alert-secondary mt-3"
+                  id="processOperationPreview"
+                >
+                  <span id="processPreviewText">Define operation above</span>
+                </div>
+                <div class="form-text">
+                  <i class="bi bi-info-circle"></i>
+                  This will update the variable's value with the result of the
+                  operation when the flow runs.
+                </div>
+              </div>
+            </div>
+            <div
+              class="alert alert-info"
+              id="noVariablesAlertProcess"
+              style="display: none"
+            >
+              <i class="bi bi-info-circle"></i> No variables available. Add
+              variables in a Declaration block first.
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              data-bs-dismiss="modal"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="btn btn-primary"
+              id="saveProcessSettings"
+              disabled
+            >
+              Save Changes
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      class="modal fade"
+      id="loopSettingsModal"
+      tabindex="-1"
+      aria-labelledby="loopSettingsModalLabel"
+    >
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="loopSettingsModalLabel">
+              Loop Block Settings
+            </h5>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+              aria-label="Close"
+            ></button>
+          </div>
+          <div class="modal-body">
+            <div class="card mb-3">
+              <div class="card-header bg-light">
+                <strong>Loop Configuration</strong>
+              </div>
+              <div class="card-body">
+                <div class="mb-3">
+                  <label class="form-label">Loop Type</label>
+                  <div class="form-check">
+                    <input
+                      class="form-check-input"
+                      type="radio"
+                      name="loopType"
+                      id="loopTypeIterations"
+                      value="iterations"
+                      checked
+                    />
+                    <label class="form-check-label" for="loopTypeIterations">
+                      Fixed Number of Iterations
+                    </label>
+                  </div>
+                </div>
+
+                <div id="iterationsSection">
+                  <div class="row g-3 mb-3">
+                    <div class="col-12 col-md-6">
+                      <label for="loopIterationType" class="form-label"
+                        >Iterations Source</label
+                      >
+                      <select class="form-select" id="loopIterationType">
+                        <option value="value" selected>Fixed Value</option>
+                        <option value="variable">From Variable</option>
+                      </select>
+                    </div>
+
+                    <div
+                      class="col-12 col-md-6"
+                      id="loopIterationValueContainer"
+                    >
+                      <label for="loopIterationValue" class="form-label"
+                        >Number of Iterations</label
+                      >
+                      <input
+                        type="number"
+                        class="form-control"
+                        id="loopIterationValue"
+                        placeholder="Enter number of iterations"
+                        min="1"
+                        value="1"
+                      />
+                    </div>
+
+                    <div
+                      class="col-12 col-md-6"
+                      id="loopIterationVarContainer"
+                      style="display: none"
+                    >
+                      <label for="loopIterationVar" class="form-label"
+                        >Variable</label
+                      >
+                      <select class="form-select" id="loopIterationVar">
+                        <option value="" selected disabled>
+                          Select variable...
+                        </option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="alert alert-secondary mt-3" id="loopPreview">
+                  <span id="loopPreviewText">Loop will execute 1 time</span>
+                </div>
+
+                <div class="form-text">
+                  <i class="bi bi-info-circle"></i>
+                  This will repeat the loop body the specified number of times.
+                </div>
+              </div>
+            </div>
+            <div
+              class="alert alert-info"
+              id="noVariablesAlertLoop"
+              style="display: none"
+            >
+              <i class="bi bi-info-circle"></i> No integer variables available
+              for iteration count. Add variables in a Declaration block first.
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              data-bs-dismiss="modal"
+            >
+              Cancel
+            </button>
+            <button type="button" class="btn btn-primary" id="saveLoopSettings">
+              Save Changes
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      class="modal fade"
+      id="inputSettingsModal"
+      tabindex="-1"
+      aria-labelledby="inputSettingsModalLabel"
+    >
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="inputSettingsModalLabel">
+              Input Block Settings
+            </h5>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+              aria-label="Close"
+            ></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-3">
+              <label for="inputSelectedVariable" class="form-label"
+                >Select Variable for Input</label
+              >
+              <select class="form-select" id="inputSelectedVariable">
+                <option value="" selected disabled>Select a variable...</option>
+              </select>
+              <div
+                id="inputSelectedVariableFeedback"
+                class="invalid-feedback"
+              ></div>
+            </div>
+            <div class="mb-3">
+              <label for="inputDisplayMessage" class="form-label"
+                >Display Message to User</label
+              >
+              <textarea
+                class="form-control"
+                id="inputDisplayMessage"
+                rows="3"
+                placeholder="Enter the message to show when prompting for input (e.g., 'Enter your name:')"
+              ></textarea>
+              <div
+                id="inputDisplayMessageFeedback"
+                class="invalid-feedback"
+              ></div>
+            </div>
+            <div
+              class="alert alert-info"
+              id="noVariablesAlertInput"
+              style="display: none"
+            >
+              <i class="bi bi-info-circle"></i> No variables available. Add
+              variables in a Declaration block first.
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              data-bs-dismiss="modal"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="btn btn-primary"
+              id="saveInputSettings"
+              disabled
+            >
+              Save Changes
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      class="modal fade"
+      id="moldoInputPromptModal"
+      tabindex="-1"
+      data-bs-backdrop="static"
+      data-bs-keyboard="false"
+      aria-labelledby="moldoInputPromptModalLabel"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="moldoInputPromptModalLabel">
+              Input Required
+            </h5>
+          </div>
+          <div class="modal-body">
+            <form id="moldoInputForm">
+              <div id="moldoInputPromptFieldContainer" class="mb-3"></div>
+            </form>
+          </div>
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-primary"
+              id="moldoInputPromptSubmitBtn"
+              disabled
+            >
+              Submit
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      class="modal fade"
+      id="exportFlowModal"
+      tabindex="-1"
+      aria-labelledby="exportFlowModalLabel"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="exportFlowModalLabel">Export Flow</h5>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+              aria-label="Close"
+            ></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-3">
+              <label for="exportFilename" class="form-label"
+                >Filename (without extension):</label
+              >
+              <input
+                type="text"
+                class="form-control"
+                id="exportFilename"
+                placeholder="moldo_flow"
+              />
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              data-bs-dismiss="modal"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="btn btn-primary"
+              id="confirmExportBtn"
+              disabled
+            >
+              Export
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <input
+      type="file"
+      id="importFileInput"
+      style="display: none"
+      accept=".json"
+    />
+
+    <script src="../assets/js/axios.min.js"></script>
+    <script src="../assets/js/bootstrap.bundle.min.js"></script>
+    <script src="../ed/js/me-flow.js"></script>
+    <script src="../ed/js/mldset.js"></script>
+
+    <script src="../ed/js/mdgen.js"></script>
+    <script src="../ed/js/mdexec.js"></script>
+    <script src="../ed/js/me.js"></script>
+  </body>
+</html>

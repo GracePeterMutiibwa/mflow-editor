@@ -1,0 +1,6 @@
+.qodo
+dist
+node_modules
+build
+package.json
+package-lock.json
