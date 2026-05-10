@@ -394,8 +394,14 @@ class MoldoImport {
             nodeElement.data.operation = { ...settingsFromImport };
         } else if (nodeTypeForData === 'loop') {
             nodeElement.data.loop = { ...settingsFromImport };
-        } else if (nodeTypeForData === 'input') { // New
+        } else if (nodeTypeForData === 'input') {
             nodeElement.data.inputConfig = { ...settingsFromImport };
+        } else if (nodeTypeForData === 'communityBlock') {
+            nodeElement.data.moldName = settingsFromImport.moldName || '';
+            nodeElement.data.blockId  = settingsFromImport.blockId  || '';
+            // manifest is persisted in dataset.settings; restore it to node.data so all
+            // live code paths (getAllDeclaredVariables, showCommunityBlockSettings) work.
+            nodeElement.data.manifest = settingsFromImport.manifest || null;
         }
     }
 }
@@ -416,20 +422,21 @@ document.addEventListener("DOMContentLoaded", function () {
 
     let componentCounter = 0;
     let flowInstance = null;
-    // id of the last node
     let lastAddedNodeId = null;
     let moldoGenInstance = null;
     let executor = null;
-    let vent = null; // For MoldoVent instance
-    let moldoImporter = null; // For MoldoImport instance
-    let moldoExporter = null; // For MoldoExport instance
-    let lastKnownServerStatus = false; // Initialize with a pessimistic default
-    const stall = new Stall(); // Instantiate Stall
+    let vent = null;
+    let moldoImporter = null;
+    let moldoExporter = null;
+    let lastKnownServerStatus = false;
+    let _communityBlockEditingNodeId = null; // tracks node open in community settings modal
+    let _installedMolds = []; // cache of mold manifests fetched from backend
+    const stall = new Stall();
     const newFlowButton = document.getElementById("moedNewFlowButton");
 
     // Make showNotification globally available for the settings module
     window.showNotification = showNotification;
-    window.addOutputMessage = addOutputMessage; // Make addOutputMessage globally available
+    window.addOutputMessage = addOutputMessage;
     window.updateTextAreaContent = updateTextAreaContent;
 
 
@@ -491,27 +498,7 @@ document.addEventListener("DOMContentLoaded", function () {
         // Initialize MoldoGen with the flow instance
         moldoGenInstance = new MoldoGen(flowInstance);
 
-        if (!window.iodide) {
-            // Show loader
-            stall.show("Setting up Moldo environment...");
-            // iodide loaded
-            window.iodide = await loadPyodide();
-
-            // load core packages
-            await window.iodide.loadPackagesFromImports("import js");
-
-            console.log("Pyodide loaded");
-            stall.hide(); // Hide loader
-        } else {
-            console.log("Pyodide already loaded");
-        }
-
-        if (!window.translator) {
-            // initialize the translator
-            window.translator = new MoldoTranslator()
-        }
-
-        // load the executor
+        // load the executor (talks to FastAPI backend)
         executor = new MoldoExecutor(flowInstance)
 
         // Initialize the exporter
@@ -536,9 +523,489 @@ document.addEventListener("DOMContentLoaded", function () {
 
         // Start server status checks
         manageServerStatusChecks();
-        refreshRunButtonVisibility(); // Initial check after setup
+        refreshRunButtonVisibility();
 
-        console.log('Server checks on;')
+        // Populate backend URL field and load installed molds
+        loadEditorSettings();
+        loadInstalledMolds();
+        initSettingsModal();
+    }
+
+    // ── Settings & Mold (Pod) management ───────────────────────
+
+    function loadEditorSettings() {
+        const urlInput = document.getElementById('backendUrlInput');
+        if (urlInput) urlInput.value = localStorage.getItem('moldo_backend_url') || 'http://127.0.0.1:8000';
+    }
+
+    async function loadInstalledMolds() {
+        if (!vent) return;
+        const molds = await vent.fetchMolds();
+        _installedMolds = molds || [];
+        refreshCommunityMoldsSidebar(molds);
+        refreshSettingsMoldsList(molds);
+    }
+
+    // Returns the block-level manifest entry for a given mold+block pair.
+    function _findBlockManifest(moldName, blockId) {
+        const mold = _installedMolds.find(m => m.name === moldName);
+        if (!mold) return null;
+        return (mold.blocks || []).find(b => b.id === blockId) || null;
+    }
+
+    function refreshCommunityMoldsSidebar(molds) {
+        const section = document.getElementById('communityMoldsSection');
+        const list    = document.getElementById('communityMoldsList');
+        if (!section || !list) return;
+
+        list.innerHTML = '';
+        let hasBlocks = false;
+
+        (molds || []).forEach(mold => {
+            if (mold.isCore) return;
+            const blocks = (mold.blocks || []);
+            if (!blocks.length) return;
+            hasBlocks = true;
+
+            // Group header per mold
+            const header = document.createElement('div');
+            header.className = 'mold-group-header';
+            header.innerHTML = `<i class="bi bi-box-seam" style="font-size:11px;"></i>${mold.displayName || mold.name}`;
+            list.appendChild(header);
+
+            const group = document.createElement('div');
+            group.className = 'mold-group-blocks';
+
+            blocks.forEach(block => {
+                const el = document.createElement('div');
+                el.className = 'moed-draggable-component community-block';
+                el.draggable = true;
+                el.dataset.componentType  = 'communityBlock';
+                el.dataset.moldName       = mold.name;
+                el.dataset.blockId        = block.id;
+                el.dataset.blockName      = block.name || block.id;
+                el.dataset.moldDisplay    = mold.displayName || mold.name;
+                el.dataset.blockManifest  = JSON.stringify(block);
+                el.title = block.description || '';
+                el.innerHTML = `
+                    <span class="comp-icon community-icon"><i class="${block.icon || 'bi bi-puzzle-fill'}"></i></span>
+                    <span class="comp-name">${block.name || block.id}</span>
+                `;
+                el.addEventListener('dragstart', handleDragStart);
+                group.appendChild(el);
+            });
+
+            list.appendChild(group);
+        });
+
+        section.style.display = hasBlocks ? 'block' : 'none';
+    }
+
+    function refreshSettingsMoldsList(molds) {
+        const container = document.getElementById('settingsMoldsList');
+        if (!container) return;
+        const community = (molds || []).filter(m => !m.isCore);
+        if (!community.length) {
+            container.innerHTML = '<div class="text-muted small">No molds installed yet.</div>';
+            return;
+        }
+        container.innerHTML = community.map(m => `
+            <div class="d-flex align-items-center justify-content-between mb-2 p-2 border rounded small">
+                <div>
+                    <strong>${m.displayName || m.name}</strong>
+                    <span class="text-muted ms-2">v${m.version || '?'}</span>
+                    <div class="text-muted" style="font-size:11px;">${(m.blocks || []).length} block(s)</div>
+                </div>
+                <button class="btn btn-sm btn-outline-danger" onclick="uninstallMoldAndRefresh('${m.name}')">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        `).join('');
+    }
+
+    window.uninstallMoldAndRefresh = async function(name) {
+        if (!confirm(`Uninstall mold "${name}"?`)) return;
+        const ok = await vent.uninstallMold(name);
+        if (ok) {
+            showNotification(`Mold "${name}" uninstalled.`);
+            loadInstalledMolds();
+        } else {
+            showNotification(`Failed to uninstall "${name}".`, true);
+        }
+    };
+
+    function initSettingsModal() {
+        const settingsBtn = document.querySelector('.moed-settings-button');
+        if (settingsBtn) {
+            settingsBtn.addEventListener('click', () => {
+                loadEditorSettings();
+                loadInstalledMolds();
+                const modal = new bootstrap.Modal(document.getElementById('editorSettingsModal'));
+                modal.show();
+            });
+        }
+
+        // Save settings
+        const saveBtn = document.getElementById('saveEditorSettings');
+        if (saveBtn) {
+            saveBtn.addEventListener('click', () => {
+                const url = (document.getElementById('backendUrlInput').value || '').trim();
+                if (url) {
+                    localStorage.setItem('moldo_backend_url', url);
+                    showNotification('Settings saved. Reconnecting…');
+                    manageServerStatusChecks();
+                }
+                bootstrap.Modal.getInstance(document.getElementById('editorSettingsModal'))?.hide();
+            });
+        }
+
+        // Test connection button
+        document.getElementById('testConnectionBtn')?.addEventListener('click', async () => {
+            const resultEl = document.getElementById('connectionTestResult');
+            resultEl.textContent = 'Testing…';
+            const ok = await vent.isAlive();
+            resultEl.textContent = ok ? '✓ Connected' : '✗ Cannot reach backend';
+            resultEl.style.color = ok ? '#198754' : '#dc3545';
+        });
+
+        // Install mold button + file picker
+        const installBtn  = document.getElementById('installMoldBtn');
+        const fileInput   = document.getElementById('moldFileInput');
+        const statusEl    = document.getElementById('installMoldStatus');
+
+        installBtn?.addEventListener('click', () => fileInput?.click());
+        fileInput?.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            statusEl.textContent = `Installing ${file.name}…`;
+            statusEl.style.color = '';
+            const result = await vent.installMold(file);
+            if (result.ok) {
+                statusEl.textContent = `✓ "${result.manifest?.displayName || file.name}" installed.`;
+                statusEl.style.color = '#198754';
+                loadInstalledMolds();
+            } else {
+                statusEl.textContent = `✗ ${result.error}`;
+                statusEl.style.color = '#dc3545';
+            }
+            e.target.value = '';
+        });
+
+        // Community block settings save button
+        document.getElementById('saveCommunityBlockBtn')?.addEventListener('click', () => {
+            saveCommunityBlockSettings();
+        });
+    }
+
+    // ── Community block drag / drop / settings ──────────────────
+
+    function getAvailableVariables() {
+        if (!flowInstance) return [];
+        const vars = [];
+        const seen = new Set();
+
+        Object.values(flowInstance.getNodes()).forEach(node => {
+            const type = flowInstance.getNodeType(node);
+
+            // From declaration blocks
+            if (type === 'declaration-component') {
+                ((node.data || {}).variables || []).forEach(v => {
+                    if (v.name && !seen.has(v.name)) {
+                        vars.push(v);
+                        seen.add(v.name);
+                    }
+                });
+            }
+
+            // From community block result variables (output fields)
+            if (type === 'community-block') {
+                const saved    = JSON.parse(node.dataset.settings || '{}');
+                const params   = saved.params || {};
+                const manifest = (node.data && node.data.manifest) || saved.manifest || null;
+                ((manifest && manifest.outputs) || []).forEach(out => {
+                    const varName = (params[out.id] || '').replace(/^@/, '').trim();
+                    if (varName && !seen.has(varName)) {
+                        vars.push({ name: varName, type: 'any' });
+                        seen.add(varName);
+                    }
+                });
+            }
+        });
+
+        return vars;
+    }
+
+    function _renderCommunityField(inp, params, availVars) {
+        const cur = params[inp.id] !== undefined ? params[inp.id] : '';
+        if (inp.type === 'select') {
+            return `<select class="form-select" id="cb_field_${inp.id}" data-inp-id="${inp.id}">
+                ${(inp.options || []).map(o =>
+                    `<option value="${o}" ${cur === o ? 'selected' : ''}>${o}</option>`
+                ).join('')}
+            </select>`;
+        }
+        if (inp.type === 'checkbox') {
+            return `<div class="form-check">
+                <input class="form-check-input" type="checkbox" id="cb_field_${inp.id}"
+                    data-inp-id="${inp.id}" ${cur ? 'checked' : ''}>
+            </div>`;
+        }
+        if (inp.type === 'variable') {
+            if (!availVars.length) {
+                return `<div class="alert alert-info py-2 small mb-0">
+                    <i class="bi bi-info-circle"></i>
+                    No variables declared yet - add a Declaration block first.
+                </div>`;
+            }
+            return `<select class="form-select" id="cb_field_${inp.id}" data-inp-id="${inp.id}">
+                <option value="">- select variable -</option>
+                ${availVars.map(v =>
+                    `<option value="@${v.name}" ${cur === '@' + v.name ? 'selected' : ''}>
+                        ${v.name}${v.type ? ' (' + v.type + ')' : ''}
+                    </option>`
+                ).join('')}
+            </select>`;
+        }
+        // text / number fallback
+        const safeVal = String(cur).replace(/"/g, '&quot;');
+        return `<input type="${inp.type === 'number' ? 'number' : 'text'}"
+            class="form-control" id="cb_field_${inp.id}" data-inp-id="${inp.id}"
+            value="${safeVal}" placeholder="${inp.placeholder || ''}">`;
+    }
+
+    const _PY_KEYWORDS = new Set([
+        'False','None','True','and','as','assert','async','await','break','class',
+        'continue','def','del','elif','else','except','finally','for','from',
+        'global','if','import','in','is','lambda','nonlocal','not','or','pass',
+        'raise','return','try','while','with','yield'
+    ]);
+
+    function _validateVarName(val) {
+        if (!val) return { ok: false, msg: '' };
+        if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(val))
+            return { ok: false, msg: 'Only letters, digits and _ - cannot start with a digit.' };
+        if (_PY_KEYWORDS.has(val))
+            return { ok: false, msg: `"${val}" is a Python keyword - pick a different name.` };
+        return { ok: true, msg: `✓ "${val}" is a valid variable name.` };
+    }
+
+    function _renderOutputField(out, params, availVars) {
+        const curVal     = (params[out.id] || '').replace(/^@/, '').trim();
+        const inExisting = availVars.some(v => v.name === curVal);
+        let mode = (inExisting && availVars.length) ? 'existing' : 'new';
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'mb-3';
+
+        // Label
+        const lbl = document.createElement('label');
+        lbl.className = 'form-label fw-semibold small';
+        lbl.textContent = out.label || 'Save result to';
+        wrapper.appendChild(lbl);
+
+        // Toggle row
+        const toggleRow = document.createElement('div');
+        toggleRow.className = 'd-flex gap-2 mb-2';
+
+        const mkBtn = (label, m) => {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = `btn btn-sm ${mode === m ? 'btn-dark' : 'btn-outline-secondary'}`;
+            b.textContent = label;
+            b.dataset.m = m;
+            if (m === 'existing' && !availVars.length) {
+                b.disabled = true;
+                b.title = 'No variables available yet';
+            }
+            return b;
+        };
+        const newBtn = mkBtn('Define new', 'new');
+        const selBtn = mkBtn('Use existing', 'existing');
+        toggleRow.appendChild(newBtn);
+        toggleRow.appendChild(selBtn);
+        wrapper.appendChild(toggleRow);
+
+        // Hidden canonical value - the one `saveCommunityBlockSettings` reads
+        const hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.dataset.outId = out.id;
+        hidden.value = curVal;
+        wrapper.appendChild(hidden);
+
+        // ── "Define new" panel ───────────────────────────────────
+        const newPanel = document.createElement('div');
+        newPanel.style.display = mode === 'new' ? '' : 'none';
+
+        const textInput = document.createElement('input');
+        textInput.type = 'text';
+        textInput.className = 'form-control form-control-sm';
+        textInput.placeholder = 'e.g. my_result';
+        textInput.value = mode === 'new' ? curVal : '';
+
+        const fb = document.createElement('div');
+        fb.className = 'form-text mt-1';
+        fb.style.minHeight = '1.1em';
+
+        function applyValidation(val) {
+            const { ok, msg } = _validateVarName(val);
+            textInput.classList.toggle('is-valid',   ok);
+            textInput.classList.toggle('is-invalid', !!val && !ok);
+            fb.style.color   = ok ? '#198754' : '#dc3545';
+            fb.textContent   = msg;
+            if (ok) hidden.value = val;
+            else if (!val) hidden.value = '';
+        }
+        textInput.addEventListener('input', () => applyValidation(textInput.value.trim()));
+        applyValidation(textInput.value.trim());
+
+        newPanel.appendChild(textInput);
+        newPanel.appendChild(fb);
+        wrapper.appendChild(newPanel);
+
+        // ── "Use existing" panel ─────────────────────────────────
+        const selPanel = document.createElement('div');
+        selPanel.style.display = mode === 'existing' ? '' : 'none';
+
+        const sel = document.createElement('select');
+        sel.className = 'form-select form-select-sm';
+        const placeholderOpt = new Option('- select variable -', '');
+        sel.appendChild(placeholderOpt);
+        availVars.forEach(v => {
+            const opt = new Option(
+                `${v.name}${v.type && v.type !== 'any' ? ' (' + v.type + ')' : ''}`,
+                v.name
+            );
+            if (mode === 'existing' && v.name === curVal) opt.selected = true;
+            sel.appendChild(opt);
+        });
+        sel.addEventListener('change', () => { hidden.value = sel.value; });
+        if (mode === 'existing') hidden.value = sel.value;
+
+        selPanel.appendChild(sel);
+        wrapper.appendChild(selPanel);
+
+        // ── Toggle logic ─────────────────────────────────────────
+        function switchMode(m) {
+            mode = m;
+            [newBtn, selBtn].forEach(b => {
+                b.classList.toggle('btn-dark',            b.dataset.m === m);
+                b.classList.toggle('btn-outline-secondary', b.dataset.m !== m);
+            });
+            newPanel.style.display = m === 'new'      ? '' : 'none';
+            selPanel.style.display = m === 'existing' ? '' : 'none';
+            if (m === 'new') {
+                textInput.focus();
+                applyValidation(textInput.value.trim());
+            } else {
+                hidden.value = sel.value;
+            }
+        }
+        newBtn.addEventListener('click', () => switchMode('new'));
+        selBtn.addEventListener('click', () => switchMode('existing'));
+
+        return wrapper;
+    }
+
+    function showCommunityBlockSettings(nodeId) {
+        const nodeEl   = flowInstance && flowInstance.getNodes()[nodeId];
+        if (!nodeEl || !nodeEl.data) return;
+
+        let { manifest, moldName, blockId } = nodeEl.data;
+        // Resolve manifest from all available sources, caching back onto node.data.
+        if (!manifest) {
+            const saved = JSON.parse(nodeEl.dataset.settings || '{}');
+            manifest = saved.manifest || _findBlockManifest(moldName, blockId) || null;
+            nodeEl.data.manifest = manifest;
+        }
+        const inputs   = (manifest && manifest.inputs) || [];
+        const settings = JSON.parse(nodeEl.dataset.settings || '{}');
+        const params   = settings.params || {};
+        const availVars = getAvailableVariables();
+
+        document.getElementById('communityBlockModalTitle').textContent =
+            (manifest && manifest.name) || blockId || 'Block Settings';
+        document.getElementById('communityBlockDescription').textContent =
+            (manifest && manifest.description) || '';
+
+        const outputs = (manifest && manifest.outputs) || [];
+
+        const fieldsEl = document.getElementById('communityBlockFields');
+        fieldsEl.innerHTML = '';
+
+        // ── Inputs ───────────────────────────────────────────────
+        if (!inputs.length && !outputs.length) {
+            fieldsEl.innerHTML = '<div class="text-muted small">This block has no configurable settings.</div>';
+        }
+
+        inputs.forEach(inp => {
+            const wrap = document.createElement('div');
+            wrap.className = 'mb-3';
+            wrap.innerHTML = `
+                <label class="form-label fw-semibold" for="cb_field_${inp.id}">
+                    ${inp.label || inp.id}
+                    ${inp.type === 'variable' ? '<span class="badge bg-secondary ms-1" style="font-size:9px;">variable</span>' : ''}
+                </label>
+                ${_renderCommunityField(inp, params, availVars)}
+                ${inp.description ? `<div class="form-text">${inp.description}</div>` : ''}
+            `;
+            fieldsEl.appendChild(wrap);
+        });
+
+        // ── Outputs (result variable selector) ───────────────────
+        if (outputs.length) {
+            const sep = document.createElement('div');
+            sep.className = inputs.length ? 'border-top mt-3 pt-3' : '';
+            const heading = document.createElement('p');
+            heading.className = 'small fw-semibold text-muted mb-2 text-uppercase';
+            heading.style.cssText = 'font-size:10px;letter-spacing:.05em;';
+            heading.textContent = 'Store Result';
+            sep.appendChild(heading);
+            outputs.forEach(out => sep.appendChild(_renderOutputField(out, params, availVars)));
+            fieldsEl.appendChild(sep);
+        }
+
+        // Available variable strip
+        if (availVars.length) {
+            const ref = document.createElement('div');
+            ref.className = 'mt-3 p-2 rounded small';
+            ref.style.cssText = 'background:#f5f5f5;color:#6b7280;font-size:11px;';
+            ref.innerHTML = `<strong>Available variables:</strong> ${availVars.map(v => `<code>${v.name}</code>`).join(' &nbsp;')}`;
+            fieldsEl.appendChild(ref);
+        }
+
+        _communityBlockEditingNodeId = nodeId;
+        const modal = new bootstrap.Modal(document.getElementById('communityBlockSettingsModal'));
+        modal.show();
+    }
+
+    function saveCommunityBlockSettings() {
+        if (!_communityBlockEditingNodeId) return;
+        const nodeEl = flowInstance && flowInstance.getNodes()[_communityBlockEditingNodeId];
+        if (!nodeEl) return;
+
+        const settings = JSON.parse(nodeEl.dataset.settings || '{}');
+        const params   = {};
+
+        // Input fields
+        document.querySelectorAll('#communityBlockFields [data-inp-id]').forEach(el => {
+            const key = el.dataset.inpId;
+            params[key] = el.type === 'checkbox' ? el.checked : el.value;
+        });
+
+        // Output (result variable) fields
+        document.querySelectorAll('#communityBlockFields [data-out-id]').forEach(el => {
+            const key = el.dataset.outId;
+            const val = (el.value || '').trim().replace(/^@/, '');
+            if (val) params[key] = val;
+        });
+
+        settings.params = params;
+        nodeEl.dataset.settings = JSON.stringify(settings);
+        MoldoSettings.updateNodeSettingsIndicator(_communityBlockEditingNodeId, true);
+
+        bootstrap.Modal.getInstance(document.getElementById('communityBlockSettingsModal'))?.hide();
+        updateTextAreaContent();
+        showNotification('Block settings saved.');
     }
 
     function createStartNode() {
@@ -607,8 +1074,14 @@ document.addEventListener("DOMContentLoaded", function () {
     editorArea.addEventListener("drop", handleDrop);
 
     function handleDragStart(e) {
+        const ds = e.target.dataset;
         e.dataTransfer.setData("text/plain", JSON.stringify({
-            componentType: e.target.dataset.componentType
+            componentType: ds.componentType,
+            moldName:      ds.moldName      || null,
+            blockId:       ds.blockId       || null,
+            blockName:     ds.blockName     || null,
+            moldDisplay:   ds.moldDisplay   || null,
+            blockManifest: ds.blockManifest || null,
         }));
         e.target.classList.add("moed-dragging");
     }
@@ -709,7 +1182,7 @@ document.addEventListener("DOMContentLoaded", function () {
             }
 
             // Create new component block as a MoldoFlow node
-            createComponentNode(componentType, x, y);
+            createComponentNode(componentType, x, y, data);
 
             // Hide empty state if there are nodes
             updateEmptyState();
@@ -734,12 +1207,12 @@ document.addEventListener("DOMContentLoaded", function () {
         const outputContent = document.getElementById("moedOutputContent");
         if (outputContent) {
             const notificationDiv = document.createElement('div');
-            notificationDiv.className = 'output-item';
-            notificationDiv.innerHTML = `<span class="${isError ? 'output-error' : 'output-warning'}">${message}</span>`;
+            notificationDiv.className = isError ? 'output-item output-error' : 'output-item output-warning';
+            notificationDiv.innerHTML = `<span>${message}</span>`;
 
             // Clear existing content if it's an error
             if (isError) {
-                outputContent.innerHTML = '<div class="output-item"><span class="output-title">Flow Validation Error:</span></div>';
+                outputContent.innerHTML = '<div class="output-item"><span class="output-title">Flow Validation Error</span></div>';
             }
 
             outputContent.appendChild(notificationDiv);
@@ -759,7 +1232,70 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
-    function createComponentNode(componentType, x, y) {
+    function createCommunityBlockNode(dragData, x, y) {
+        componentCounter++;
+        const nodeId   = `moed-component-${componentCounter}`;
+        const blockName    = dragData.blockName    || 'Block';
+        const moldName     = dragData.moldName     || '';
+        const blockId      = dragData.blockId      || '';
+        const moldDisplay  = dragData.moldDisplay  || moldName;
+        const manifest     = dragData.blockManifest ? JSON.parse(dragData.blockManifest) : {};
+
+        const nodeContent = `
+            <div class="node-content" data-type="communityBlock" style="font-size:12px;">
+                <span style="display:block;font-size:10px;opacity:.55;margin-bottom:2px;">${moldDisplay}</span>
+                ${blockName}
+            </div>
+            <div class="node-controls">
+                <div class="node-divider"></div>
+                <button type="button" class="node-settings-btn" title="Block Settings">
+                    <i class="bi bi-gear"></i>
+                </button>
+            </div>
+        `;
+
+        const closestNodeId = findClosestNodeTo(x, y);
+
+        const node = flowInstance.addNode({
+            id:   nodeId,
+            x:    x - 90,
+            y:    y - 30,
+            width: 180,
+            height: 60,
+            content:   nodeContent,
+            className: 'moldo-node community-block',
+            connectToLastNode: false,
+            data: { name: blockName, type: 'communityBlock', moldName, blockId, manifest }
+        });
+
+        // Save settings to dataset - manifest included so it survives export/import
+        node.dataset.settings = JSON.stringify({ moldName, blockId, manifest, params: {} });
+        node.data = { name: blockName, type: 'communityBlock', moldName, blockId, manifest };
+
+        setTimeout(() => {
+            const btn = document.querySelector(`#${nodeId} .node-settings-btn`);
+            if (btn) btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                showCommunityBlockSettings(nodeId);
+            });
+            MoldoSettings.updateNodeSettingsIndicator(nodeId, false);
+        }, 0);
+
+        if (closestNodeId) flowInstance.edge(closestNodeId, nodeId);
+        else if (lastAddedNodeId) flowInstance.edge(lastAddedNodeId, nodeId);
+
+        lastAddedNodeId = nodeId;
+        updateEmptyState();
+        updateTextAreaContent();
+        return node;
+    }
+
+    function createComponentNode(componentType, x, y, dragData = {}) {
+        // Handle community (pod) blocks separately
+        if (componentType === 'communityBlock') {
+            return createCommunityBlockNode(dragData, x, y);
+        }
+
         // Keep the original ID format
         componentCounter++;
         const nodeId = `moed-component-${componentCounter}`;
@@ -1143,22 +1679,26 @@ document.addEventListener("DOMContentLoaded", function () {
 
         const allNodes = flowInstance.getNodes();
         Object.values(allNodes).forEach(nodeElement => {
-            const nodeId = nodeElement.id;
+            const nodeId   = nodeElement.id;
             const nodeType = flowInstance.getNodeType(nodeElement);
 
-            // Check if this node type should have a settings button
-            if (nodeType !== "termination-component" && nodeId !== "start-node" && nodeType !== "decision-node") {
-                const settingsBtn = nodeElement.querySelector('.node-settings-btn');
-                if (settingsBtn) {
-                    // Clone to remove old listeners, then add new one
-                    const newBtn = settingsBtn.cloneNode(true);
-                    settingsBtn.parentNode.replaceChild(newBtn, settingsBtn);
-                    newBtn.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        MoldoSettings.showNodeSettings(nodeId);
-                    });
+            if (nodeType === 'termination-component' || nodeId === 'start-node' || nodeType === 'decision-node') return;
+
+            const settingsBtn = nodeElement.querySelector('.node-settings-btn');
+            if (!settingsBtn) return;
+
+            // Clone to wipe any stale listeners
+            const newBtn = settingsBtn.cloneNode(true);
+            settingsBtn.parentNode.replaceChild(newBtn, settingsBtn);
+
+            newBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (nodeType === 'community-block') {
+                    showCommunityBlockSettings(nodeId);
+                } else {
+                    MoldoSettings.showNodeSettings(nodeId);
                 }
-            }
+            });
         });
     }
 
@@ -1514,6 +2054,57 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         }
 
+        // Check community blocks - mold installed, block exists, required params set
+        const communityBlocks = Object.entries(allNodes)
+            .filter(([, node]) => flowInstance.getNodeType(node) === 'community-block')
+            .map(([id, node]) => ({ id, node }));
+
+        for (const { id, node } of communityBlocks) {
+            const settings  = JSON.parse(node.dataset.settings || '{}');
+            const moldName  = (node.data && node.data.moldName) || settings.moldName || '';
+            const blockId   = (node.data && node.data.blockId)  || settings.blockId  || '';
+            const params    = settings.params || {};
+
+            if (!moldName || !blockId) {
+                return { valid: false, message: `Community block (${id}) has no mold or block configured.` };
+            }
+
+            // Verify the mold is installed
+            const mold = _installedMolds.find(m => m.name === moldName);
+            if (!mold) {
+                return { valid: false, message: `Community block (${id}) requires mold "${moldName}" which is not installed.` };
+            }
+
+            // Verify the block exists in that mold
+            const blockDef = (mold.blocks || []).find(b => b.id === blockId);
+            if (!blockDef) {
+                return { valid: false, message: `Community block (${id}): block "${blockId}" not found in mold "${moldName}".` };
+            }
+
+            // Verify all required inputs are filled
+            for (const inp of (blockDef.inputs || [])) {
+                const val = (params[inp.id] || '').toString().trim();
+                if (!val) {
+                    return { valid: false, message: `Community block (${id}) - "${blockDef.name || blockId}": input "${inp.label || inp.id}" is not set.` };
+                }
+                // If the input expects a variable reference, make sure the variable exists
+                if (inp.type === 'variable' && val.startsWith('@')) {
+                    const varName = val.slice(1);
+                    if (!findVariable(varName)) {
+                        return { valid: false, message: `Community block (${id}) - "${blockDef.name || blockId}": variable "@${varName}" is not declared.` };
+                    }
+                }
+            }
+
+            // Verify output variable is defined
+            for (const out of (blockDef.outputs || [])) {
+                const outVar = (params[out.id] || '').toString().trim();
+                if (!outVar) {
+                    return { valid: false, message: `Community block (${id}) - "${blockDef.name || blockId}": output variable not set.` };
+                }
+            }
+        }
+
         // ... (rest of validation: decision nodes, conditional nodes, reachability) ...
 
         return { valid: true };
@@ -1656,7 +2247,7 @@ document.addEventListener("DOMContentLoaded", function () {
      */
     async function executeFlowObjectRunner() {
         const outputContent = document.getElementById("moedOutputContent");
-        outputContent.innerHTML = '<div class="output-item"><span class="output-title">Execution Started</span></div>';
+        outputContent.innerHTML = '';
 
         // Validate first
         const validationResult = validateFlowBeforeRun();
@@ -1666,8 +2257,6 @@ document.addEventListener("DOMContentLoaded", function () {
             addOutputMessage(`Flow validation failed: ${validationResult.message}`, true);
             return;
         }
-
-        addOutputMessage("Generating execution plan...");
 
         if (!moldoGenInstance) {
             addOutputMessage("Error: Flow object generator not initialized.", true);
@@ -1691,48 +2280,13 @@ document.addEventListener("DOMContentLoaded", function () {
             return;
         }
 
-        console.log("Executing Flow Object:");
-
-        console.log(JSON.stringify(flowObject, null, 2));
-
-        addOutputMessage("Starting flow execution...");
-
         // Reset highlights
         const allNodesUI = flowInstance.getNodes();
-
         Object.keys(allNodesUI).forEach(nodeId => flowInstance.highlight(nodeId, false));
-
         flowInstance.resetHighlightedEdges();
 
-        // Get the delay from the slider
-        const delayInSeconds = speedSlider ? parseFloat(speedSlider.value) : 0.5;
-
-        // Cast flowObject to Moldo code, including the delay
-        const resultantMoldoCode = this.translator.cast(flowObject, delayInSeconds);
-
-        // Display Moldo code in the text area
-        textArea.value = resultantMoldoCode;
-
-        console.log('Loaded..:', resultantMoldoCode)
-
-
-        // Compile Moldo code to Python
-        const resultantPythonCode = await executor.netManager.toPython(resultantMoldoCode);
-
-        // console.log('moldo::')
-        // console.log(resultantMoldoCode);
-
-        if (resultantPythonCode && navigator.onLine) {
-            // Execute the Python code
-            await executor.execute(resultantPythonCode);
-
-        } else if (!navigator.onLine) {
-            addOutputMessage("Error: No internet connection. Cannot compile flow.", true);
-        } else {
-            addOutputMessage("Error: Failed to compile flow to Python.", true);
-        }
-
-        addOutputMessage("Flow execution finished.");
+        // Send to backend and display results
+        await executor.runFlow(flowObject);
 
         // Re-enable run button after execution
         updateRunButtonState();
@@ -1743,20 +2297,43 @@ document.addEventListener("DOMContentLoaded", function () {
     // --- Keep existing helper functions like delay, addOutputMessage --- 
     function addOutputMessage(message, isError = false) {
         const outputContent = document.getElementById("moedOutputContent");
-        if (!outputContent) return; // Guard if element not found
+        if (!outputContent) return;
+
         const div = document.createElement('div');
-        div.className = 'output-item';
-        div.innerHTML = `<span class="${isError ? 'output-error' : ''}">${message}</span>`;
-        outputContent.appendChild(div);
-        requestAnimationFrame(() => {
-            outputContent.scrollTo({ top: outputContent.scrollHeight, behavior: 'smooth' });
-            // Fallback scrolling
-            setTimeout(() => {
-                if (outputContent.scrollTop !== outputContent.scrollHeight) {
-                    outputContent.scrollTop = outputContent.scrollHeight;
-                }
-            }, 150);
+        div.className = isError ? 'output-item output-error' : 'output-item';
+
+        // Copy button - visible on hover
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'output-copy-btn';
+        copyBtn.title = 'Copy';
+        const copyImg = document.createElement('img');
+        copyImg.src = 'engine/assets/icons/copy.svg';
+        copyImg.alt = 'copy';
+        copyBtn.appendChild(copyImg);
+        copyBtn.addEventListener('click', () => {
+            navigator.clipboard.writeText(String(message)).then(() => {
+                copyImg.style.filter = 'hue-rotate(120deg) saturate(2)';
+                setTimeout(() => { copyImg.style.filter = ''; }, 1500);
+            }).catch(() => {});
         });
+        div.appendChild(copyBtn);
+
+        // Content area - rendered by MDRenderer
+        const content = document.createElement('div');
+        content.className = 'output-content';
+        div.appendChild(content);
+
+        outputContent.appendChild(div);
+
+        if (typeof MDRenderer === 'function') {
+            MDRenderer().load(content, String(message)).catch(() => {
+                content.textContent = message;
+            });
+        } else {
+            content.textContent = message;
+        }
+
+        requestAnimationFrame(() => { outputContent.scrollTop = outputContent.scrollHeight; });
     }
 
 
@@ -1978,10 +2555,9 @@ document.addEventListener("DOMContentLoaded", function () {
     function refreshRunButtonVisibility() { // No longer takes isServerAlive as param
         if (!runButton) return;
 
-        const isOnline = navigator.onLine;
-        const pyodideLoaded = !!window.iodide;
-        const nodeCount = editorArea.querySelectorAll(".moldo-node").length;
-        const serverIsActuallyAlive = lastKnownServerStatus; // Use the stored status
+        const isOnline             = navigator.onLine;
+        const nodeCount            = editorArea.querySelectorAll(".moldo-node").length;
+        const serverIsActuallyAlive = lastKnownServerStatus;
 
         const serverStatusContainer = document.querySelector(".moed-server-status");
         const statusIndicator = serverStatusContainer ? serverStatusContainer.querySelector(".moed-status-indicator") : null;
@@ -1991,35 +2567,28 @@ document.addEventListener("DOMContentLoaded", function () {
         if (!isOnline) {
             if (statusIndicator) statusIndicator.parentElement.classList.add("moed-disconnected");
             if (statusTextElement) statusTextElement.textContent = " Network offline";
-        } else if (!pyodideLoaded) {
-            if (statusIndicator) statusIndicator.parentElement.classList.add("moed-disconnected");
-            if (statusTextElement) statusTextElement.textContent = " Engine initializing...";
         } else if (!serverIsActuallyAlive) {
             if (statusIndicator) statusIndicator.parentElement.classList.add("moed-disconnected");
             if (statusTextElement) statusTextElement.textContent = " Flow engine disconnected";
-        } else { // All three: Online, Pyodide Loaded, Server Alive
-            if (statusIndicator) statusIndicator.parentElement.classList.remove("moed-disconnected"); // Green
+        } else {
+            if (statusIndicator) statusIndicator.parentElement.classList.remove("moed-disconnected");
             if (statusTextElement) statusTextElement.textContent = " Flow engine connected";
         }
 
         // --- Logic for Run Button Visibility ---
-        const environmentReadyForExecution = isOnline && pyodideLoaded && serverIsActuallyAlive;
+        const environmentReadyForExecution = isOnline && serverIsActuallyAlive;
 
         if (environmentReadyForExecution && nodeCount > 1) {
             runButton.classList.remove('d-none');
             runButton.title = "Run Flow";
         } else {
             runButton.classList.add('d-none');
-            // Set runButton title based on the primary reason it's hidden
             if (!isOnline) {
                 runButton.title = "Network is offline. Cannot run flow.";
-            } else if (!pyodideLoaded) {
-                runButton.title = "Python environment not ready.";
             } else if (!serverIsActuallyAlive) {
                 runButton.title = "Flow engine is disconnected. Cannot run flow.";
-            } else if (nodeCount <= 1) {
+            } else {
                 runButton.title = "Add more nodes to the flow to enable Run.";
-                // The status indicator and text are handled by the block above.
             }
         }
     }

@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>MoldoSidebar — demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+  html, body { margin:0; height:100%; display:flex; background:#fafaf9; }
+  #canvas { flex:1; display:flex; align-items:center; justify-content:center;
+    font-family:"JetBrains Mono",monospace; font-size:12px; color:#9a9a9a;
+    flex-direction:column; gap:8px; }
+  #drop-hint { font-size:11px; color:#d4d4d4; }
+  #log { position:fixed; bottom:12px; right:12px; background:#1a1a1a; color:#a3e635;
+    font-family:"JetBrains Mono",monospace; font-size:11px; padding:10px 14px;
+    border-radius:6px; max-width:340px; }
+</style>
+</head>
+<body>
+
+<div id="sidebar-mount" style="height:100%;"></div>
+
+<div id="canvas">
+  <span>← drag a block here</span>
+  <span id="drop-hint"></span>
+</div>
+<div id="log">Drag events will appear here…</div>
+
+<!-- registry + sidebar scripts (paths relative to this demo) -->
+<script src="../../engine/MoldoRegistry.js"></script>
+<script src="./MoldoSidebar.js"></script>
+
+<script>
+  const log  = document.getElementById('log');
+  const hint = document.getElementById('drop-hint');
+
+  const registry = new MoldoRegistry();
+
+  /* load all 7 built-in manifests relative to this demo file */
+  const manifests = [
+    '../../molds/variables.mold.json',
+    '../../molds/io.mold.json',
+    '../../molds/control.mold.json',
+    '../../molds/math.mold.json',
+    '../../molds/text.mold.json',
+    '../../molds/collections.mold.json',
+    '../../molds/functions.mold.json',
+  ];
+
+  registry.loadAll(manifests).then(() => {
+    log.textContent = `Registry loaded: ${registry.allBlocks().length} blocks across ${registry.allMolds().length} molds.`;
+  });
+
+  const sidebar = new MoldoSidebar({
+    registry,
+    onDragStart: (e, block) => {
+      log.textContent = `Dragging: ${block.moldName}.${block.id} (${block.name})`;
+    },
+  });
+
+  document.getElementById('sidebar-mount').appendChild(sidebar.el);
+
+  /* simulate drop on canvas area */
+  const canvas = document.getElementById('canvas');
+  canvas.addEventListener('dragover',  e => e.preventDefault());
+  canvas.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const raw = e.dataTransfer.getData('application/moldo-block');
+    if (!raw) return;
+    const { key } = JSON.parse(raw);
+    const [moldName, blockId] = key.split('.');
+    const block = registry.getBlock(moldName, blockId);
+    hint.textContent = `Dropped: ${block.name} from ${block.moldDisplayName}`;
+    log.textContent  = `Drop → key="${key}"  nodeShape="${block.nodeShape}"  nodeType="${block.nodeType}"`;
+  });
+
+  /* demo: simulate installing a new mold after 3 s */
+  setTimeout(() => {
+    registry.register({
+      name: 'demo_mold',
+      displayName: 'Demo Mold',
+      version: '0.1.0',
+      isCore: false,
+      blocks: [{
+        id: 'greet', name: 'Greet', description: 'Say hello',
+        nodeShape: 'rect', nodeType: 'output', color: 'amber', icon: 'send',
+        moldName: 'demo_mold', moldDisplayName: 'Demo Mold', key: 'demo_mold.greet',
+        inputs: [{ id:'name', label:'Name', type:'text', placeholder:'World' }],
+        outputs: [],
+      }],
+    });
+    log.textContent = 'Demo mold installed — sidebar refreshed automatically.';
+  }, 3000);
+</script>
+</body>
+</html>

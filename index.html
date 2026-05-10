@@ -1,26 +1,20 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Moldo Visual Editor</title>
-    <link rel="icon" href="../assets/icons/moldo.png" type="image/png" />
+    <title>Moldo Flow Editor</title>
+    <link rel="icon" href="engine/assets/icons/moldo.png" type="image/png" />
     <link
       rel="stylesheet"
-      href="../assets/bootstrapicons/bootstrap-icons.css"
+      href="engine/assets/bootstrapicons/bootstrap-icons.css"
     />
-
-    <link rel="stylesheet" href="../assets/boxicons/css/boxicons.min.css" />
-    <link rel="stylesheet" href="../assets/css/mds.css" />
-    <link rel="stylesheet" href="../assets/css/mdsven.css" />
-    <link rel="stylesheet" href="../assets/css/mdsex.css" />
-    <link rel="stylesheet" href="../assets/css/mdsons.css" />
-
-    <link rel="stylesheet" href="../ed/css/me.css" />
-    <script
-      src="https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js"
-      defer
-    ></script>
+    <link rel="stylesheet" href="engine/assets/boxicons/css/boxicons.min.css" />
+    <link rel="stylesheet" href="engine/assets/css/mds.css" />
+    <link rel="stylesheet" href="engine/assets/css/mdsven.css" />
+    <link rel="stylesheet" href="engine/assets/css/mdsex.css" />
+    <link rel="stylesheet" href="engine/assets/css/mdsons.css" />
+    <link rel="stylesheet" href="engine/assets/css/me.css" />
   </head>
   <body>
     <div class="moed-container moed-visual-mode" id="moedEditor">
@@ -50,69 +44,135 @@
 
       <main class="moed-content">
         <aside class="moed-sidebar">
-          <div
-            class="moed-component-list-container bg-soft-secondary border-bottom"
-          >
-            <h4 class="px-3 py-2 mb-0">Flow Components</h4>
-            <div class="moed-component-list">
-              <div
-                class="moed-draggable-component process-node"
-                draggable="true"
-                data-component-type="component1"
-              >
-                Process Block
+          <div class="sidebar-scroll-area">
+            <div class="moed-component-list-container">
+              <div class="sidebar-section-header">
+                <i class="bi bi-grid-1x2"></i> Flow Components
               </div>
-              <div
-                class="moed-draggable-component input-component"
-                draggable="true"
-                data-component-type="component10"
-              >
-                Input Block
-              </div>
-              <div
-                class="moed-draggable-component decision-node"
-                draggable="true"
-                data-component-type="component2"
-              >
-                Decision Block
-              </div>
-              <div
-                class="moed-draggable-component output-node"
-                draggable="true"
-                data-component-type="component3"
-              >
-                Output Block
-              </div>
-              <div
-                class="moed-draggable-component declaration-component"
-                draggable="true"
-                data-component-type="component5"
-              >
-                Declaration Block
-              </div>
-              <div
-                class="moed-draggable-component loop-component"
-                draggable="true"
-                data-component-type="component7"
-              >
-                Loop Block
-              </div>
-              <div
-                class="moed-draggable-component termination-component"
-                draggable="true"
-                data-component-type="component8"
-              >
-                Termination Block
-              </div>
-              <div
-                class="moed-draggable-component conditional-component"
-                draggable="true"
-                data-component-type="component4"
-              >
-                Conditional Block
+              <div class="moed-component-list">
+                <div
+                  class="moed-draggable-component process-node"
+                  draggable="true"
+                  data-component-type="component1"
+                  title="Perform an operation on a variable"
+                >
+                  <span class="comp-icon"
+                    ><img
+                      src="engine/assets/icons/default-block.svg"
+                      class="default-block-svg"
+                      alt=""
+                  /></span>
+                  <span class="comp-name">Process Block</span>
+                </div>
+                <div
+                  class="moed-draggable-component declaration-component"
+                  draggable="true"
+                  data-component-type="component5"
+                  title="Declare and initialise variables"
+                >
+                  <span class="comp-icon"
+                    ><img
+                      src="engine/assets/icons/default-block.svg"
+                      class="default-block-svg"
+                      alt=""
+                  /></span>
+                  <span class="comp-name">Declaration Block</span>
+                </div>
+                <div
+                  class="moed-draggable-component input-component"
+                  draggable="true"
+                  data-component-type="component10"
+                  title="Prompt the user for a value"
+                >
+                  <span class="comp-icon"
+                    ><img
+                      src="engine/assets/icons/default-block.svg"
+                      class="default-block-svg"
+                      alt=""
+                  /></span>
+                  <span class="comp-name">Input Block</span>
+                </div>
+                <div
+                  class="moed-draggable-component output-node"
+                  draggable="true"
+                  data-component-type="component3"
+                  title="Display a value or message"
+                >
+                  <span class="comp-icon"
+                    ><img
+                      src="engine/assets/icons/default-block.svg"
+                      class="default-block-svg"
+                      alt=""
+                  /></span>
+                  <span class="comp-name">Output Block</span>
+                </div>
+                <div
+                  class="moed-draggable-component conditional-component"
+                  draggable="true"
+                  data-component-type="component4"
+                  title="Branch based on a condition"
+                >
+                  <span class="comp-icon"
+                    ><img
+                      src="engine/assets/icons/default-block.svg"
+                      class="default-block-svg"
+                      alt=""
+                  /></span>
+                  <span class="comp-name">Conditional Block</span>
+                </div>
+                <div
+                  class="moed-draggable-component decision-node"
+                  draggable="true"
+                  data-component-type="component2"
+                  title="Route flow to multiple paths"
+                >
+                  <span class="comp-icon"
+                    ><img
+                      src="engine/assets/icons/default-block.svg"
+                      class="default-block-svg"
+                      alt=""
+                  /></span>
+                  <span class="comp-name">Decision Block</span>
+                </div>
+                <div
+                  class="moed-draggable-component loop-component"
+                  draggable="true"
+                  data-component-type="component7"
+                  title="Repeat a set of nodes"
+                >
+                  <span class="comp-icon"
+                    ><img
+                      src="engine/assets/icons/default-block.svg"
+                      class="default-block-svg"
+                      alt=""
+                  /></span>
+                  <span class="comp-name">Loop Block</span>
+                </div>
+                <div
+                  class="moed-draggable-component termination-component"
+                  draggable="true"
+                  data-component-type="component8"
+                  title="End the flow"
+                >
+                  <span class="comp-icon"
+                    ><img
+                      src="engine/assets/icons/default-block.svg"
+                      class="default-block-svg"
+                      alt=""
+                  /></span>
+                  <span class="comp-name">Termination Block</span>
+                </div>
               </div>
             </div>
+
+            <div id="communityMoldsSection" style="display: none">
+              <div class="sidebar-section-header">
+                <i class="bi bi-box-seam-fill"></i> Installed Molds
+              </div>
+              <div id="communityMoldsList"></div>
+            </div>
           </div>
+
           <div class="moed-sidebar-bottom">
             <div class="list-group rounded-0">
               <a
@@ -174,10 +234,10 @@
           </div>
         </div>
 
-        <div class="moed-output-pane bg-light">
-          <div class="moed-output-content-container p-2">
-            <div class="moed-output-title border-bottom pb-3">Flow Output</div>
-            <div class="moed-output-content p-0" id="moedOutputContent">
+        <div class="moed-output-pane">
+          <div class="moed-output-content-container">
+            <div class="moed-output-title">Flow Output</div>
+            <div class="moed-output-content" id="moedOutputContent">
               <div class="output-item">
                 <span class="output-title">Flow Editor</span>
                 <span
@@ -187,7 +247,7 @@
               </div>
             </div>
           </div>
-          <div class="moed-server-status bg-white moed-disconnected">
+          <div class="moed-server-status moed-disconnected">
             <span class="moed-status-indicator"></span>
             Flow engine connected
           </div>
@@ -410,8 +470,8 @@
                       <option value="!=">!== (Not equal to)</option>
                       <option value=">">> (Greater than)</option>
                       <option value=">=">>= (Greater than or equal)</option>
-                      <option value="<">< (Less than)</option>
-                      <option value="<="><= (Less than or equal)</option>
+                      <option value="<">&#60; (Less than)</option>
+                      <option value="<=">&#60;= (Less than or equal)</option>
                       <option value="%">% (Modulus is)</option>
                     </select>
                   </div>
@@ -540,7 +600,7 @@
                       <option value="*">* (Multiply)</option>
                       <option value="/">/ (Divide)</option>
                       <option value="^2">^2 (Square)</option>
-                      <option value="sqrt">√ (Square Root)</option>
+                      <option value="sqrt">&#8730; (Square Root)</option>
                       <option value="%">% (Modulus)</option>
                     </select>
                   </div>
@@ -584,9 +644,9 @@
                   <span id="processPreviewText">Define operation above</span>
                 </div>
                 <div class="form-text">
-                  <i class="bi bi-info-circle"></i>
-                  This will update the variable's value with the result of the
-                  operation when the flow runs.
+                  <i class="bi bi-info-circle"></i> This will update the
+                  variable's value with the result of the operation when the
+                  flow runs.
                 </div>
               </div>
             </div>
@@ -656,12 +716,11 @@
                       value="iterations"
                       checked
                     />
-                    <label class="form-check-label" for="loopTypeIterations">
-                      Fixed Number of Iterations
-                    </label>
+                    <label class="form-check-label" for="loopTypeIterations"
+                      >Fixed Number of Iterations</label
+                    >
                   </div>
                 </div>
-
                 <div id="iterationsSection">
                   <div class="row g-3 mb-3">
                     <div class="col-12 col-md-6">
@@ -673,7 +732,6 @@
                         <option value="variable">From Variable</option>
                       </select>
                     </div>
-
                     <div
                       class="col-12 col-md-6"
                       id="loopIterationValueContainer"
@@ -690,7 +748,6 @@
                         value="1"
                       />
                     </div>
-
                     <div
                       class="col-12 col-md-6"
                       id="loopIterationVarContainer"
@@ -707,14 +764,12 @@
                     </div>
                   </div>
                 </div>
-
                 <div class="alert alert-secondary mt-3" id="loopPreview">
                   <span id="loopPreviewText">Loop will execute 1 time</span>
                 </div>
-
                 <div class="form-text">
-                  <i class="bi bi-info-circle"></i>
-                  This will repeat the loop body the specified number of times.
+                  <i class="bi bi-info-circle"></i> This will repeat the loop
+                  body the specified number of times.
                 </div>
               </div>
             </div>
@@ -907,6 +962,145 @@
       </div>
     </div>
 
+    <div
+      class="modal fade"
+      id="editorSettingsModal"
+      tabindex="-1"
+      aria-labelledby="editorSettingsModalLabel"
+    >
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="editorSettingsModalLabel">
+              <i class="bi bi-gear me-2"></i>Editor Settings
+            </h5>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+              aria-label="Close"
+            ></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-4">
+              <h6 class="fw-semibold border-bottom pb-2 mb-3">
+                Backend Connection
+              </h6>
+              <div class="mb-3">
+                <label for="backendUrlInput" class="form-label"
+                  >Backend URL</label
+                >
+                <div class="input-group">
+                  <input
+                    type="text"
+                    class="form-control font-monospace"
+                    id="backendUrlInput"
+                    placeholder="http://127.0.0.1:8000"
+                  />
+                  <button
+                    class="btn btn-outline-secondary"
+                    type="button"
+                    id="testConnectionBtn"
+                  >
+                    <i class="bi bi-plug"></i> Test
+                  </button>
+                </div>
+                <div class="form-text" id="connectionTestResult"></div>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <h6 class="fw-semibold border-bottom pb-2 mb-3">
+                Installed Molds (Pods)
+              </h6>
+              <div id="settingsMoldsList" class="mb-3">
+                <div class="text-muted small">Loading…</div>
+              </div>
+              <div>
+                <button
+                  class="btn btn-sm btn-primary"
+                  type="button"
+                  id="installMoldBtn"
+                >
+                  <i class="bi bi-box-arrow-in-down"></i> Install Mold (.mold
+                  file)
+                </button>
+                <input
+                  type="file"
+                  id="moldFileInput"
+                  accept=".mold"
+                  style="display: none"
+                />
+                <div id="installMoldStatus" class="mt-2 small"></div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              data-bs-dismiss="modal"
+            >
+              Close
+            </button>
+            <button
+              type="button"
+              class="btn btn-primary"
+              id="saveEditorSettings"
+            >
+              Save Settings
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      class="modal fade"
+      id="communityBlockSettingsModal"
+      tabindex="-1"
+      aria-labelledby="communityBlockModalTitle"
+    >
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="communityBlockModalTitle">
+              Block Settings
+            </h5>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+              aria-label="Close"
+            ></button>
+          </div>
+          <div class="modal-body">
+            <div
+              id="communityBlockDescription"
+              class="text-muted small mb-3"
+            ></div>
+            <div id="communityBlockFields"></div>
+          </div>
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              data-bs-dismiss="modal"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="btn btn-primary"
+              id="saveCommunityBlockBtn"
+            >
+              Save Changes
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <input
       type="file"
       id="importFileInput"
@@ -914,13 +1108,13 @@
       accept=".json"
     />
 
-    <script src="../assets/js/axios.min.js"></script>
-    <script src="../assets/js/bootstrap.bundle.min.js"></script>
-    <script src="../ed/js/me-flow.js"></script>
-    <script src="../ed/js/mldset.js"></script>
-
-    <script src="../ed/js/mdgen.js"></script>
-    <script src="../ed/js/mdexec.js"></script>
-    <script src="../ed/js/me.js"></script>
+    <script src="engine/assets/js/axios.min.js"></script>
+    <script src="engine/assets/js/bootstrap.bundle.min.js"></script>
+    <script src="engine/assets/js/mrnd.js"></script>
+    <script src="engine/me-flow.js"></script>
+    <script src="engine/mldset.js"></script>
+    <script src="engine/mdgen.js"></script>
+    <script src="engine/mdexec.js"></script>
+    <script src="engine/me.js"></script>
   </body>
 </html>

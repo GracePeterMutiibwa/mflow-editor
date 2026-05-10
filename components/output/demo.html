@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>MoldoOutput — demo</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+  html, body { margin:0; height:100%; display:flex; flex-direction:column; background:#1a1a1a; }
+  #output-wrap { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+  #controls { padding:10px 14px; display:flex; gap:8px; border-top:1px solid #1f2937; flex-shrink:0; }
+  #controls button { padding:6px 12px; border:1px solid #374151; border-radius:4px; background:transparent;
+    color:#9ca3af; cursor:pointer; font-family:"JetBrains Mono",monospace; font-size:11px; }
+  #controls button:hover { background:#1f2937; color:#e5e5e5; }
+</style>
+</head>
+<body>
+
+<div id="output-wrap"></div>
+<div id="controls">
+  <button onclick="doPrint()">print()</button>
+  <button onclick="doError()">error()</button>
+  <button onclick="doInfo()">info()</button>
+  <button onclick="doRunning()">toggle running</button>
+  <button onclick="doClear()">clear()</button>
+  <button onclick="doSimulate()">simulate program</button>
+</div>
+
+<script src="./MoldoOutput.js"></script>
+<script>
+  const out = new MoldoOutput();
+  document.getElementById('output-wrap').appendChild(out.el);
+  Object.assign(out.el.style, { flex:'1', height:'0' });  /* fill wrapper */
+
+  out.info('Output panel ready. Click buttons below to test.');
+
+  function doPrint()  { out.print('Hello from the program!'); }
+  function doError()  { out.error('NameError: name "x" is not defined'); }
+  function doInfo()   { out.info('Connecting to backend…'); }
+  function doClear()  { out.clear(); }
+  function doRunning(){ out.setRunning(!out._dotEl.style.animation.includes('moldoOutputPulse')); }
+
+  function doSimulate() {
+    out.clear();
+    out.setRunning(true);
+    const lines = [
+      ['info',  'Running program…'],
+      ['print', 'counter = 0'],
+      ['print', 'Count: 1'],
+      ['print', 'Count: 2'],
+      ['print', 'Count: 3'],
+      ['print', 'Final counter value: 6'],
+      ['info',  'Done in 0.12s'],
+    ];
+    let i = 0;
+    const id = setInterval(() => {
+      if (i >= lines.length) { clearInterval(id); out.setRunning(false); return; }
+      out[lines[i][0]](lines[i][1]);
+      i++;
+    }, 260);
+  }
+
+  doSimulate();
+</script>
+</body>
+</html>

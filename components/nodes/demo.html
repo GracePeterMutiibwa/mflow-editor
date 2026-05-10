@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>MoldoNode — demo</title>
+<style>
+  body { margin: 0; background: #fafaf9; font-family: "IBM Plex Sans", system-ui, sans-serif; }
+  @keyframes moldoPulse {
+    0%   { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(1.18); }
+  }
+  #canvas { position: relative; width: 100vw; height: 100vh; }
+  #controls {
+    position: fixed; top: 16px; left: 16px; z-index: 10;
+    display: flex; flex-direction: column; gap: 8px;
+    background: #fff; border: 1px solid #e6e6e6; border-radius: 6px; padding: 12px;
+    font-size: 12px; font-family: "JetBrains Mono", monospace;
+  }
+  #controls button {
+    padding: 6px 10px; border: 1px solid #d4d4d4; border-radius: 4px;
+    background: #f5f5f5; cursor: pointer; font-family: inherit; font-size: 11px;
+  }
+  #controls button:hover { background: #eff4ff; border-color: #2563eb; color: #2563eb; }
+  #log { position: fixed; bottom: 16px; left: 16px; right: 16px; background: #1a1a1a;
+    color: #a3e635; font-family: "JetBrains Mono", monospace; font-size: 11px;
+    padding: 10px 14px; border-radius: 6px; max-height: 120px; overflow-y: auto; }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+</head>
+<body>
+
+<div id="controls">
+  <strong>MoldoNode demo</strong>
+  <button onclick="addSample('rect')">Add rect node</button>
+  <button onclick="addSample('diamond')">Add diamond node</button>
+  <button onclick="addSample('circle')">Add circle node</button>
+  <button onclick="toggleSelected()">Toggle selected</button>
+  <button onclick="toggleRunning()">Toggle running</button>
+  <button onclick="toggleDone()">Toggle done</button>
+  <button onclick="setParams()">Set params</button>
+</div>
+
+<div id="canvas"></div>
+<div id="log">Events will appear here…</div>
+
+<script src="./MoldoNode.js"></script>
+<script>
+  const canvas = document.getElementById('canvas');
+  const log    = document.getElementById('log');
+  let   lastNode = null;
+
+  function print(msg) {
+    log.textContent = msg;
+  }
+
+  /* sample block manifests — in production these come from MoldoRegistry */
+  const blocks = {
+    rect: {
+      name: 'Calculate', description: 'Apply an arithmetic operation',
+      nodeShape: 'rect', nodeType: 'process', color: 'rose', icon: 'calc',
+      inputs: [
+        { id: 'left',     label: 'First value',  type: 'text' },
+        { id: 'operator', label: 'Operation',    type: 'select', options: ['+','-','*','/'] },
+        { id: 'right',    label: 'Second value', type: 'text' },
+        { id: 'result',   label: 'Store in',     type: 'text' },
+      ],
+      outputs: [{ id: 'result', label: 'Result variable' }],
+    },
+    diamond: {
+      name: 'If / Else', description: 'Branch on a condition',
+      nodeShape: 'diamond', nodeType: 'decision', color: 'slate', icon: 'branch',
+      hasBranches: true,
+      inputs: [
+        { id: 'left',     label: 'Left value',  type: 'text' },
+        { id: 'operator', label: 'Operator',    type: 'select', options: ['==','!=','>','<'] },
+        { id: 'right',    label: 'Right value', type: 'text' },
+      ],
+      outputs: [],
+    },
+    circle: {
+      name: 'Return', description: 'Exit function with a value',
+      nodeShape: 'circle', nodeType: 'output', color: 'slate', icon: 'send',
+      inputs: [{ id: 'value', label: 'Value to return', type: 'text' }],
+      outputs: [],
+    },
+  };
+
+  let idCounter = 0;
+
+  function addSample(shape) {
+    const block = blocks[shape];
+    const node  = new MoldoNode({
+      id:       'node-' + (++idCounter),
+      moldName: 'demo',
+      blockId:  shape,
+      block,
+      x: 80 + Math.random() * 400,
+      y: 80 + Math.random() * 300,
+    });
+
+    canvas.appendChild(node.el);
+    lastNode = node;
+
+    /* bubble events to the log */
+    node.el.addEventListener('moldo:node:mousedown', e => print(`mousedown on ${e.detail.node.id}`));
+    node.el.addEventListener('moldo:node:dblclick',  e => print(`dblclick on ${e.detail.node.id} — would open panel`));
+    node.el.addEventListener('moldo:node:connect',   e => print(`connect drag started from ${e.detail.node.id}`));
+
+    print(`Created ${shape} node: ${node.id}`);
+    return node;
+  }
+
+  function toggleSelected() {
+    if (!lastNode) return;
+    lastNode._selected ? lastNode.deselect() : lastNode.select();
+    print(`${lastNode.id} selected: ${lastNode._selected}`);
+  }
+
+  function toggleRunning() {
+    if (!lastNode) return;
+    lastNode.setRunning(!lastNode._running);
+    print(`${lastNode.id} running: ${lastNode._running}`);
+  }
+
+  function toggleDone() {
+    if (!lastNode) return;
+    lastNode.setDone(!lastNode._done);
+    print(`${lastNode.id} done: ${lastNode._done}`);
+  }
+
+  function setParams() {
+    if (!lastNode) return;
+    lastNode.setParams({ left: '@score', operator: '+', right: '10', result: 'total' });
+    print(`${lastNode.id} params updated — subtitle should refresh`);
+  }
+
+  /* seed with one of each */
+  addSample('rect');
+  addSample('diamond');
+  addSample('circle');
+</script>
+</body>
+</html>

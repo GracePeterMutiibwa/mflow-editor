@@ -1223,25 +1223,46 @@ function getAllDeclaredVariables() {
 
     const allNodes = flowInstance.getNodes();
     const variables = [];
+    const seen = new Set();
 
-    // Loop through all nodes to find declaration blocks
     Object.values(allNodes).forEach(node => {
-        if (node && flowInstance.getNodeType(node) === 'declaration-component') {
-            // Get variables from this declaration block
-            const nodeData = node.data || {};
-            const nodeVariables = nodeData.variables || [];
+        if (!node) return;
+        const type = flowInstance.getNodeType(node);
 
-            // Add all variables to our collection
+        // Variables from Declaration blocks
+        if (type === 'declaration-component') {
+            const nodeVariables = (node.data || {}).variables || [];
             nodeVariables.forEach(variable => {
-                // Skip duplicates - if variable with same name already exists
-                if (!variables.some(v => v.name === variable.name)) {
+                if (variable.name && !seen.has(variable.name)) {
+                    seen.add(variable.name);
                     variables.push({
                         name: variable.name,
                         type: variable.type,
-                        blockId: node.id // Keep track of which block this variable is from
+                        blockId: node.id
                     });
                 }
             });
+        }
+
+        // Variables produced by community (mold) blocks - stored in params[outputId]
+        if (type === 'community-block') {
+            try {
+                const saved    = JSON.parse(node.dataset.settings || '{}');
+                const params   = saved.params || {};
+                // manifest lives in node.data (live) or dataset.settings (after import)
+                const manifest = (node.data && node.data.manifest) || saved.manifest || null;
+                ((manifest && manifest.outputs) || []).forEach(out => {
+                    const varName = (params[out.id] || '').replace(/^@/, '').trim();
+                    if (varName && !seen.has(varName)) {
+                        seen.add(varName);
+                        variables.push({
+                            name: varName,
+                            type: 'any',
+                            blockId: node.id
+                        });
+                    }
+                });
+            } catch (_) {}
         }
     });
 

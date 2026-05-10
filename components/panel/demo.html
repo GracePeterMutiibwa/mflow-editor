@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>MoldoPanel — demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+  body { margin:0; background:#fafaf9; font-family:"IBM Plex Sans",system-ui,sans-serif; display:flex; align-items:center; justify-content:center; height:100vh; }
+  #toolbar { position:fixed; top:16px; left:16px; display:flex; flex-direction:column; gap:8px; }
+  #toolbar button { padding:8px 14px; border:1px solid #d4d4d4; border-radius:4px; background:#fff; cursor:pointer; font-family:inherit; font-size:12px; }
+  #toolbar button:hover { background:#eff4ff; border-color:#2563eb; color:#2563eb; }
+  #output { position:fixed; bottom:16px; left:16px; right:16px; background:#1a1a1a; color:#a3e635;
+    font-family:"JetBrains Mono",monospace; font-size:11px; padding:12px 16px; border-radius:6px;
+    white-space:pre; max-height:140px; overflow-y:auto; }
+  /* fake node target to position panel near */
+  #fakeNode { width:220px; height:86px; background:#fff; border:1px solid #e6e6e6; border-radius:3px;
+    box-shadow:0 1px 2px rgba(0,0,0,.06); display:flex; align-items:center; justify-content:center;
+    font-size:12px; color:#6b6b6b; font-family:"JetBrains Mono",monospace; }
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+  <strong style="font-size:12px; font-family:'JetBrains Mono',monospace;">MoldoPanel demo</strong>
+  <button onclick="openText()">Open text block panel</button>
+  <button onclick="openSelect()">Open select block panel</button>
+  <button onclick="openMath()">Open math (with output) panel</button>
+  <button onclick="openBranch()">Open if/else panel</button>
+</div>
+
+<div id="fakeNode">← panel appears here</div>
+<div id="output">Saved params will appear here…</div>
+
+<script src="./MoldoPanel.js"></script>
+<script>
+  const output   = document.getElementById('output');
+  const fakeNode = document.getElementById('fakeNode');
+
+  /* mock MoldoNode with just .el */
+  const mockNode = { el: fakeNode };
+
+  const panel = new MoldoPanel({
+    block:   null,
+    params:  {},
+    onSave:  (params, node) => { output.textContent = 'Saved:\n' + JSON.stringify(params, null, 2); },
+    onClose: () => { output.textContent += '\nPanel closed.'; },
+  });
+  document.body.appendChild(panel.el);
+
+  const blocks = {
+    text: {
+      name: 'Declare Variable', moldDisplayName: 'variables',
+      description: 'Create a new variable with an initial value',
+      inputs: [
+        { id:'name',     label:'Variable name', type:'text',   placeholder:'myVar' },
+        { id:'dataType', label:'Type',          type:'select', options:['text','int','float','bool'] },
+        { id:'value',    label:'Initial value', type:'text',   placeholder:'0' },
+      ],
+      outputs: [],
+    },
+    select: {
+      name: 'Modify Variable', moldDisplayName: 'variables',
+      description: 'Apply an arithmetic operation in place',
+      inputs: [
+        { id:'target',   label:'Variable', type:'variable', placeholder:'counter' },
+        { id:'operator', label:'By',       type:'select',   options:['+=','-=','*=','/=','//=','%=','**='] },
+        { id:'value',    label:'Amount',   type:'number',   placeholder:'1' },
+      ],
+      outputs: [],
+    },
+    math: {
+      name: 'Calculate', moldDisplayName: 'math',
+      description: 'Apply an arithmetic operation',
+      inputs: [
+        { id:'left',     label:'First value',  type:'text',   placeholder:'@a or 10' },
+        { id:'operator', label:'Operation',    type:'select', options:['+','-','*','/','//','%','**'] },
+        { id:'right',    label:'Second value', type:'text',   placeholder:'@b or 5' },
+        { id:'result',   label:'Store in',     type:'text',   placeholder:'result' },
+      ],
+      outputs: [{ id:'result', label:'Result variable' }],
+    },
+    branch: {
+      name: 'If / Else', moldDisplayName: 'control',
+      description: 'Follow yes path if condition is true',
+      inputs: [
+        { id:'left',     label:'Left value',  type:'text',   placeholder:'@score or 100' },
+        { id:'operator', label:'Operator',    type:'select', options:['==','!=','>','<','>=','<='] },
+        { id:'right',    label:'Right value', type:'text',   placeholder:'50 or @threshold' },
+      ],
+      outputs: [],
+    },
+  };
+
+  function openText()   { panel.open(mockNode, blocks.text,   {}); }
+  function openSelect() { panel.open(mockNode, blocks.select, { operator: '-=' }); }
+  function openMath()   { panel.open(mockNode, blocks.math,   { left:'@x', operator:'*', right:'2', result:'doubled' }); }
+  function openBranch() { panel.open(mockNode, blocks.branch, {}); }
+
+  openText();
+</script>
+</body>
+</html>
