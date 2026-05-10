@@ -46,7 +46,7 @@ Pick the installer for your platform:
     </td>
     <td align="center" width="200">
       <a href="https://github.com/GracePeterMutiibwa/mflow-editor/releases/latest">
-        <img src="https://cdn.simpleicons.org/windows/0078D4" width="48" height="48" alt="Windows" /><br/>
+        <img src="https://img.shields.io/badge/Windows-0078D4?style=for-the-badge&logo=windows&logoColor=white" width="48" height="48" alt="Windows" /><br/>
         <strong>Windows</strong>
       </a><br/>
       <sub>.exe installer</sub>
